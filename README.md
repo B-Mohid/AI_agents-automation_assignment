@@ -103,6 +103,3 @@ python main.py
 
 Contributions, feedback, and optimization ideas for the agent workflows are welcome! Feel free to open an issue or submit a pull request.
 
-```
-
-```
