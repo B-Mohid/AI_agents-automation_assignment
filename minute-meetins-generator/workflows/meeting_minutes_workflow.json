@@ -1,0 +1,90 @@
+{
+  "name": "Meeting Minutes & Action Item Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meeting-transcript",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "options": {
+          "systemMessage": "You are an executive Chief of Staff AI agent. Analyze the provided raw meeting transcript and output JSON adhering strictly to the schema provided.\n\nExtract:\n1. Executive Summary (3-4 concise sentences)\n2. Strategic Decisions Made (List of strings)\n3. Action Items (List of objects: task, owner, deadline, priority)\n4. Unresolved Risks/Blockers (List of strings)"
+        }
+      },
+      "id": "2",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.output || $json;\nlet html = `<h2>${data.title || 'Meeting Summary & Action Items'}</h2>`;\nhtml += `<p><strong>Executive Summary:</strong> ${data.summary || 'N/A'}</p>`;\nhtml += `<h3>Strategic Decisions Made</h3><ul>`;\nif (Array.isArray(data.decisions) && data.decisions.length > 0) {\n  data.decisions.forEach(d => { html += `<li>${d}</li>`; });\n} else {\n  html += `<li>No major decisions logged.</li>`;\n}\nhtml += `</ul>`;\nhtml += `<h3>Action Items</h3><table border=\"1\" cellpadding=\"6\" style=\"border-collapse:collapse; width:100%;\">\n<tr><th>Task</th><th>Owner</th><th>Deadline</th><th>Priority</th></tr>`;\nif (Array.isArray(data.action_items) && data.action_items.length > 0) {\n  data.action_items.forEach(item => {\n    html += `<tr><td>${item.task}</td><td>${item.owner}</td><td>${item.deadline || 'N/A'}</td><td>${item.priority}</td></tr>`;\n  });\n} else {\n  html += `<tr><td colspan=\"4\">No action items assigned.</td></tr>`;\n}\nhtml += `</table>`;\nreturn { json: { formatted_html: html, raw_data: data } };"
+      },
+      "id": "3",
+      "name": "Format HTML Code Node",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [580, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.raw_data.recipient_email || 'stakeholders@example.com' }}",
+        "subject": "={{ 'Meeting Minutes: ' + $json.raw_data.title }}",
+        "message": "={{ $json.formatted_html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "4",
+      "name": "Send Gmail Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [820, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Anthropic Chat Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "main": [
+        [
+          {
+            "node": "Format HTML Code Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format HTML Code Node": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
